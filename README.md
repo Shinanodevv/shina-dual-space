@@ -1,15 +1,15 @@
 # Shina Dual Space
 
-Dual-space style launcher inspired by Multiple Accounts: Dual Space. Add your favorite apps to your own Dual Space grid, hide sensitive ones in the Secret Zone, and protect everything with an optional PIN.
+Dual-space style app cloner inspired by Multiple Accounts: Dual Space. Clone apps into an Android Work Profile so each clone has separate data and login.
 
-## v1.0 features
-- Dual Space grid with icons of apps you add
-- Searchable picker listing all launchable installed apps
-- Tap to open, long-press to move between Dual Space / Secret Zone or remove
-- Secret Zone separated from the main grid
-- Optional 4-6 digit PIN lock (hashed, stored on device)
+## v2.0 — real cloning via Work Profile
+- Creates a managed Work Profile (same tech as Shelter / Island / Samsung Secure Folder)
+- Clone installed apps into the profile with `installExistingPackage` — separate data/login
+- Launch clones cross-profile via LauncherApps
+- Dual Space grid (✓ = cloned), searchable clone picker, Secret Zone, optional 4-6 digit PIN lock
+- Shina avatar icon
 
-> v1.0 is a companion launcher: opening an app launches the original app. A true virtual container (separate cloned data) is planned for a later version.
+> v1.0 was a companion launcher only. v2.0 is the real clone: you must approve the one-time Work Profile setup in Android settings screens. One clone per app.
 
 ## Build
-APK is built by GitHub Actions (`.github/workflows/build-apk.yml`). Download releases from the Releases page.
+APK is built by GitHub Actions (`.github/workflows/build-apk.yml`). Download from Releases.
