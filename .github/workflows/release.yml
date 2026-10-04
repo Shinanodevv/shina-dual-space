@@ -1,0 +1,48 @@
+name: Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v1.0.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0
+          name: Shina Dual Space v1.0
+          body: |
+            Shina Dual Space v1.0 — dual-space style launcher inspired by Multiple Accounts: Dual Space.
+
+            Install: download ShinaDualSpace-v1.0.apk below, open it on your Android phone, and allow installation if asked. On first open, the app lists your installed apps so you can add them to your Dual Space.
+
+            Features: Dual Space grid with your chosen apps, searchable add-app picker listing all launchable installed apps, tap to open an app, long-press to move/remove, Secret Zone to hide apps from the main grid, and an optional 4-6 digit PIN lock (set it from the lock button).
+
+            Honest note: v1.0 is a companion launcher — tapping an app opens the original app. It is not yet a virtual container that runs a separate cloned copy with its own data; that is the planned next step.
+          files: ShinaDualSpace-v1.0.apk
