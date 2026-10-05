@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Only apps signed with the same certificate (our own copies across
-         profiles) may trigger a clone. v2.2 hardening. -->
-    <permission
-        android:name="com.shina.dualspace.permission.TRIGGER_CLONE"
-        android:label="Trigger Shina Dual clone"
-        android:protectionLevel="signature" />
-
+    <!-- v2.3: signature-level permission removed from the clone entry point.
+         Each GitHub Actions debug build is signed with a fresh runner debug
+         key, so the personal-profile and work-profile copies (installed from
+         different releases) have different certificates and the signature
+         check silently blocked every clone request. Protection now relies on
+         the explicit confirmation dialog in CloneActivity: another app can
+         at most pop the dialog, it cannot clone without the user tapping Ya. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <uses-permission android:name="com.shina.dualspace.permission.TRIGGER_CLONE" />
 
     <queries>
         <intent>
@@ -36,11 +35,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Sole clone entry point: signature-protected + user confirmation. -->
+        <!-- Sole clone entry point. Exported without a signature permission
+             (see note above); safety comes from the mandatory confirmation
+             dialog inside CloneActivity, never a silent install. -->
         <activity
             android:name=".CloneActivity"
             android:exported="true"
-            android:permission="com.shina.dualspace.permission.TRIGGER_CLONE"
             android:theme="@style/Theme.ShinaDualSpace">
             <intent-filter>
                 <action android:name="com.shina.dualspace.CLONE" />
