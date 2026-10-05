@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Only apps signed with the same certificate (our own copies across
+         profiles) may trigger a clone. v2.2 hardening. -->
+    <permission
+        android:name="com.shina.dualspace.permission.TRIGGER_CLONE"
+        android:label="Trigger Shina Dual clone"
+        android:protectionLevel="signature" />
+
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="com.shina.dualspace.permission.TRIGGER_CLONE" />
 
     <queries>
         <intent>
@@ -16,6 +24,9 @@
         android:icon="@drawable/ic_launcher"
         android:roundIcon="@drawable/ic_launcher"
         android:theme="@style/Theme.ShinaDualSpace">
+
+        <!-- Launcher only. No CLONE intent-filter here anymore: an exported
+             launcher activity must not be a clone trigger. -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -23,12 +34,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- Sole clone entry point: signature-protected + user confirmation. -->
+        <activity
+            android:name=".CloneActivity"
+            android:exported="true"
+            android:permission="com.shina.dualspace.permission.TRIGGER_CLONE"
+            android:theme="@style/Theme.ShinaDualSpace">
             <intent-filter>
                 <action android:name="com.shina.dualspace.CLONE" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="com.shina.dualspace.SETUP_PROFILE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
