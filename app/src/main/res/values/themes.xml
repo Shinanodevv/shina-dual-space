@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Shina Dual Space</string>
+    <string name="admin_label">Shina Dual Admin</string>
+    <string name="admin_description">Allows Shina Dual Space to create and manage a work profile for cloned apps.</string>
     <style name="Theme.ShinaDualSpace" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">#7C6CFF</item>
         <item name="colorPrimaryVariant">#5A45E0</item>
