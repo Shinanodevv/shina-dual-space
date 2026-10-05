@@ -30,23 +30,27 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.2.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.3.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.2
-          name: Shina Dual Space v2.2
+          tag_name: v2.3
+          name: Shina Dual Space v2.3
           body: |
-            Shina Dual Space v2.2 — security hardening for the clone trigger.
+            Shina Dual Space v2.3 — fixes cloned apps doing nothing when tapped.
 
-            Why: in v2.0/v2.1 the exported MainActivity also carried the CLONE intent-filter with no permission, so any other app on the phone could send a clone intent into the Work Profile and it would run installExistingPackage immediately (with only a toast). That pattern resembles the abused Shelter-fork pattern in recent Vwork/Gigabud reporting. This is hardening based on a code review — it is not a report that the app was exploited.
+            Root cause found: v2.2 protected the clone entry point with a signature-level permission. Every GitHub Actions debug build is signed with a fresh runner debug key, so the copy in your personal profile and the copy inside the Work Profile (installed from a different release) have different certificates — Android silently blocked every clone request. Tapping did nothing.
 
-            Changes in v2.2:
-            - Clone requests now go through a dedicated CloneActivity protected by a signature-level permission (com.shina.dualspace.permission.TRIGGER_CLONE). Only apps signed with the same certificate — our personal-profile and work-profile copies — can trigger it. The launcher MainActivity no longer accepts clone intents.
-            - Every clone request now requires an explicit confirmation dialog in the work profile ("Ya, clone" / "Batal") before anything is installed.
-            - Indonesian banking / e-wallet apps trigger a hard warning before cloning (banking apps may treat a fresh Work Profile session as a high-risk signal). It warns and requires an explicit "Tetap lanjut, saya paham" — it does not silently proceed. Strong recommendation: do not clone banking/e-wallet apps.
-            - Same warnings apply to the in-app clone picker and the manual clone-by-package dialog.
+            Changes in v2.3:
+            - Removed the signature permission from the clone entry point. Safety now comes from the mandatory confirmation dialog in the work profile: nothing can be cloned without you tapping "Ya, clone". Another app can at most pop that dialog.
+            - Launch failures are no longer swallowed silently; you will see the actual launch error in a dialog instead of a dead tap.
+            - Finance-app warnings from v2.2 stay.
 
-            Install: download ShinaDualSpace-v2.2.apk below and install over v2.1. Your list, PIN and existing Work Profile stay. After updating, open the Work Profile copy (briefcase badge) once, as with v2.1, then clone from the personal copy and confirm the new dialog.
-          files: ShinaDualSpace-v2.2.apk
+            REQUIRED clean start (important): because the old Work Profile was created by a differently-signed build, delete it first, then set up fresh with this single v2.3 APK so both copies share one signature.
+            1. Settings > search "profil kerja" > Hapus profil kerja (this deletes old clones and their data; your main apps are untouched).
+            2. Uninstall Shina Dual Space, then install ShinaDualSpace-v2.3.apk.
+            3. Open it > Setup Work Profile > approve. Open the briefcase-badge copy once, then clone from the main copy and confirm the dialog.
+
+            Honest note: this fixes the identified signature-mismatch blocker, but on-device confirmation is still needed. If a tap still fails, the new dialog shows the error text — send us exactly that text.
+          files: ShinaDualSpace-v2.3.apk
