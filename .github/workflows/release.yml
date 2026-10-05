@@ -30,19 +30,25 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v1.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.0.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0
-          name: Shina Dual Space v1.0
+          tag_name: v2.0
+          name: Shina Dual Space v2.0
           body: |
-            Shina Dual Space v1.0 — dual-space style launcher inspired by Multiple Accounts: Dual Space.
+            Shina Dual Space v2.0 — now with real cloning via Android Work Profile.
 
-            Install: download ShinaDualSpace-v1.0.apk below, open it on your Android phone, and allow installation if asked. On first open, the app lists your installed apps so you can add them to your Dual Space.
+            What changed from v1.0: v1 was only a launcher (tapping opened the original app). v2.0 creates a managed Work Profile (same technology as Shelter / Island / Samsung Secure Folder) and clones apps into it, so each clone has its own data and login, separate from the main app.
 
-            Features: Dual Space grid with your chosen apps, searchable add-app picker listing all launchable installed apps, tap to open an app, long-press to move/remove, Secret Zone to hide apps from the main grid, and an optional 4-6 digit PIN lock (set it from the lock button).
+            Install: download ShinaDualSpace-v2.0.apk below, open it on your Android phone, allow installation if asked (it updates over v1.0, your Dual Space list and PIN stay). 
 
-            Honest note: v1.0 is a companion launcher — tapping an app opens the original app. It is not yet a virtual container that runs a separate cloned copy with its own data; that is the planned next step.
-          files: ShinaDualSpace-v1.0.apk
+            How to use the real clone:
+            1. Open the app and tap "Setup Work Profile", then approve Android's work profile creation screens. This is a one-time setup. If your phone already has a work profile from work/Shelter/Island, setup may fail — tell us in that case.
+            2. After setup, open Shina Dual Space once from the work profile side if Android asks (icon with a small briefcase badge), so it can finish enabling the profile.
+            3. Back in the main app, tap + Tambah and pick an app — it will be cloned into the Work Profile. Tap a cloned app (marked with a check) to launch the clone with separate data. Long-press an app for clone/open/move options.
+            4. Secret Zone and the optional 4-6 digit PIN lock from v1.0 are still there.
+
+            Notes: one clone per app (one work profile), cloned apps show Android's briefcase badge outside this app, and removing a clone completely is done from Android Settings for the work profile. This is an install-over update of the v1.0 launcher with the same package name.
+          files: ShinaDualSpace-v2.0.apk
