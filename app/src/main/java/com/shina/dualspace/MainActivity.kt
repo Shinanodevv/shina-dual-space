@@ -264,18 +264,32 @@ class MainActivity : AppCompatActivity() {
     private fun handleIncomingIntent(intent: Intent?) {
         if (intent == null) return
         if (intent.action == ACTION_CLONE) {
-            val pkg = intent.getStringExtra(EXTRA_PKG) ?: return
-            if (isInWorkProfile() || isProfileOwner()) {
-                cloneInsideWork(pkg)
-            } else {
-                // v2.0 silently dropped this case, so taps looked like nothing happened.
-                Toast.makeText(
-                    this,
-                    "Request clone nyasar ke profil utama. Buka Shina Dual Space yang ikonnya ada badge koper (Work Profile), clone dari sana ya.",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+            // v2.2: clone requests belong to CloneActivity (signature-protected).
+            // MainActivity no longer handles them; this is only a safety net.
+            Toast.makeText(
+                this,
+                "Request clone harus lewat jalur aman baru. Update app, lalu clone lagi dari daftar.",
+                Toast.LENGTH_LONG
+            ).show()
         }
+    }
+
+    private fun confirmFinanceThen(pkg: String, label: String, action: () -> Unit) {
+        if (!FinanceGuard.isFinanceApp(pkg, label)) {
+            action()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ App keuangan terdeteksi")
+            .setMessage(
+                "$label ($pkg) kelihatan seperti app bank / e-wallet.\n\n" +
+                    "Clone app keuangan ke Work Profile baru bisa dianggap sinyal high-risk oleh bank " +
+                    "(perangkat/profil baru), dan pola ini lagi diawasi ketat. Sangat disarankan JANGAN clone app ini.\n\n" +
+                    "Tetap lanjut cuma kalau kamu paham risikonya."
+            )
+            .setPositiveButton("Tetap lanjut, saya paham") { _, _ -> action() }
+            .setNegativeButton("Batalkan", null)
+            .show()
     }
 
     private fun cloneInsideWork(pkg: String) {
@@ -293,6 +307,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestClone(pkg: String) {
+        val label = allApps.firstOrNull { it.pkg == pkg }?.label ?: pkg
+        confirmFinanceThen(pkg, label) { requestCloneInner(pkg) }
+    }
+
+    private fun requestCloneInner(pkg: String) {
         if (isInWorkProfile()) {
             cloneInsideWork(pkg)
             return
@@ -330,10 +349,12 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Paket kosong", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                cloneInsideWork(pkg)
-                addTo(pkg, Section.DUAL)
-                section = Section.DUAL
-                refresh()
+                confirmFinanceThen(pkg, pkg) {
+                    cloneInsideWork(pkg)
+                    addTo(pkg, Section.DUAL)
+                    section = Section.DUAL
+                    refresh()
+                }
             }
             .setNegativeButton("Batal", null)
             .show()
