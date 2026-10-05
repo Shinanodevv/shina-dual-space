@@ -11,13 +11,32 @@ android {
         applicationId = "com.shina.dualspace"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "2.3"
+        versionCode = 6
+        versionName = "2.4"
+    }
+
+    // Stable signing since v2.4: previously every GitHub Actions debug build
+    // got a fresh runner debug key, so updates could not install over each
+    // other and the two profile copies never matched signatures. This is a
+    // throwaway debug-grade keystore committed on purpose (not a release
+    // secret; this app is not shipped to Play with it).
+    signingConfigs {
+        create("shinaStable") {
+            storeFile = file("shina-debug.p12")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeType = "PKCS12"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("shinaStable")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shinaStable")
         }
     }
 
