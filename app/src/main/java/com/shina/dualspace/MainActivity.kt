@@ -320,16 +320,35 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Udah ditambahin. Setup Work Profile dulu biar jadi clone beneran (data pisah).", Toast.LENGTH_LONG).show()
             return
         }
-        // Ask the work-profile side of our app to install the existing package there.
-        // v2.1 fix: do NOT setPackage() — that pinned the intent to the personal
-        // profile so Android never forwarded it across profiles.
+        // v2.4: jangan andelin implicit intent + chooser "Complete Action Using"
+        // lagi. Di HP user (Xiaomi) tab Work di chooser itu kosong terus, jadi
+        // request clone nyangkut di profil personal. Jalur yang bener buat
+        // app yang punya kopian di dua profil: CrossProfileApps.startActivity
+        // langsung ke CloneActivity kita di Work Profile, tanpa chooser.
+        val work = workProfileUser()
+        if (work != null) {
+            try {
+                val cpa = getSystemService(android.content.pm.CrossProfileApps::class.java)
+                if (cpa != null && cpa.targetUserProfiles.contains(work)) {
+                    val target = Intent(this, CloneActivity::class.java)
+                    target.action = ACTION_CLONE
+                    target.putExtra(EXTRA_PKG, pkg)
+                    cpa.startActivity(target, work)
+                    Toast.makeText(this, "Minta clone $pkg ke Work Profile... cek dialog konfirmasinya ya.", Toast.LENGTH_LONG).show()
+                    return
+                }
+            } catch (e: Exception) {
+                // jatuh ke jalur lama di bawah
+            }
+        }
+        // Fallback: implicit intent (Android yang nerusin/pilih profil).
         try {
             val intent = Intent(ACTION_CLONE)
             intent.addCategory(Intent.CATEGORY_DEFAULT)
             intent.putExtra(EXTRA_PKG, pkg)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
-            Toast.makeText(this, "Minta clone $pkg ke Work Profile... kalau ga jalan, buka Shina Dual versi badge koper lalu clone dari sana.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Minta clone $pkg ke Work Profile... kalau muncul pilihan profil, pilih yang Work ya.", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             Toast.makeText(this, "Belum bisa clone otomatis. Buka Shina Dual Space dari Work Profile (ikon badge koper), lalu clone dari sana.", Toast.LENGTH_LONG).show()
         }
