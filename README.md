@@ -2,14 +2,14 @@
 
 Dual-space style app cloner inspired by Multiple Accounts: Dual Space. Clone apps into an Android Work Profile so each clone has separate data and login.
 
-## v2.3 — tap-does-nothing fix
-v2.2's signature-level permission silently blocked clones: each GitHub Actions debug build uses a fresh signing key, so the personal-profile and work-profile copies never matched certificates. v2.3 removes that permission and relies on the mandatory confirmation dialog instead (nothing clones without the user tapping Ya), and launch errors are now shown instead of swallowed.
+## v2.4 — direct cross-profile clone + stable signing
+On Xiaomi devices the Android "Complete Action Using" chooser always showed an empty Work tab, so clone requests looped back to the personal profile. v2.4 sends clone requests with CrossProfileApps.startActivity (the official same-app cross-profile API) straight to the work-profile confirmation dialog, and signs every build with a committed throwaway debug-grade keystore so updates install over each other and both profile copies share one signature.
 
-**Clean start required:** delete the old Work Profile (Settings > search "profil kerja" > Hapus), reinstall with the single v2.3 APK, then set up fresh so both copies share one signature.
+**One last clean start:** delete the old Work Profile (Settings > search "profil kerja" > Hapus), reinstall with the v2.4 APK, set up fresh. From v2.4 onward updates should install normally.
 
 ## Features
 - Managed Work Profile (same tech as Shelter / Island / Samsung Secure Folder)
-- Clone via `installExistingPackage` with explicit confirmation, launch via LauncherApps
+- CrossProfileApps clone requests with explicit confirmation, installExistingPackage, LauncherApps launch
 - Hard warning before cloning Indonesian banking / e-wallet apps
 - Dual Space grid (✓ = cloned), searchable picker, Secret Zone, optional PIN lock
 
