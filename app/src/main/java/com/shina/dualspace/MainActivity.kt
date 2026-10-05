@@ -90,6 +90,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.tabDualBtn).setOnClickListener { section = Section.DUAL; refresh() }
         findViewById<Button>(R.id.tabSecretBtn).setOnClickListener { openSecret() }
         findViewById<Button>(R.id.addBtn).setOnClickListener {
+            if (isInWorkProfile()) {
+                showManualCloneDialog()
+                return@setOnClickListener
+            }
             pickerTarget = if (section == Section.SECRET) Section.SECRET else Section.DUAL
             section = Section.PICKER
             refresh()
@@ -159,7 +163,9 @@ class MainActivity : AppCompatActivity() {
         if (isInWorkProfile()) return myHandle
         for (profile in profiles) {
             if (profile != myHandle) {
-                // Confirm our app exists in that profile (= likely our work profile)
+                // Only treat it as OUR work profile if our own app is installed there.
+                // v2.0 fell back to any other profile, which could misdetect a
+                // company/Shelter profile and send clone requests nowhere useful.
                 try {
                     val apps = launcherApps.getActivityList(packageName, profile)
                     if (apps.isNotEmpty()) return profile
@@ -168,8 +174,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        // Fallback: any non-primary profile
-        return profiles.firstOrNull { it != myHandle }
+        return null
     }
 
     private fun hasWorkProfile(): Boolean = workProfileUser() != null
@@ -262,6 +267,13 @@ class MainActivity : AppCompatActivity() {
             val pkg = intent.getStringExtra(EXTRA_PKG) ?: return
             if (isInWorkProfile() || isProfileOwner()) {
                 cloneInsideWork(pkg)
+            } else {
+                // v2.0 silently dropped this case, so taps looked like nothing happened.
+                Toast.makeText(
+                    this,
+                    "Request clone nyasar ke profil utama. Buka Shina Dual Space yang ikonnya ada badge koper (Work Profile), clone dari sana ya.",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
@@ -289,17 +301,42 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Udah ditambahin. Setup Work Profile dulu biar jadi clone beneran (data pisah).", Toast.LENGTH_LONG).show()
             return
         }
-        // Ask the work-profile side of our app to install the existing package there
+        // Ask the work-profile side of our app to install the existing package there.
+        // v2.1 fix: do NOT setPackage() — that pinned the intent to the personal
+        // profile so Android never forwarded it across profiles.
         try {
             val intent = Intent(ACTION_CLONE)
             intent.addCategory(Intent.CATEGORY_DEFAULT)
             intent.putExtra(EXTRA_PKG, pkg)
-            intent.setPackage(packageName)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
-            Toast.makeText(this, "Minta clone $pkg ke Work Profile...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Minta clone $pkg ke Work Profile... kalau ga jalan, buka Shina Dual versi badge koper lalu clone dari sana.", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             Toast.makeText(this, "Belum bisa clone otomatis. Buka Shina Dual Space dari Work Profile (ikon badge koper), lalu clone dari sana.", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun showManualCloneDialog() {
+        val input = EditText(this)
+        input.hint = "Nama paket, mis. com.whatsapp"
+        input.inputType = InputType.TYPE_CLASS_TEXT
+        AlertDialog.Builder(this)
+            .setTitle("Clone manual (di dalam Work Profile)")
+            .setMessage("Kamu lagi di dalam Work Profile. Ketik nama paket app dari profil utama, nanti aku clone ke sini. Nama paket bisa diliat dari tahan-app di profil utama.")
+            .setView(input)
+            .setPositiveButton("Clone") { _, _ ->
+                val pkg = input.text.toString().trim()
+                if (pkg.isEmpty()) {
+                    Toast.makeText(this, "Paket kosong", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                cloneInsideWork(pkg)
+                addTo(pkg, Section.DUAL)
+                section = Section.DUAL
+                refresh()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun isCloned(pkg: String): Boolean {
@@ -368,6 +405,26 @@ class MainActivity : AppCompatActivity() {
                 list.add(AppEntry(pkg, pm.getApplicationLabel(info).toString(), pm.getApplicationIcon(info)))
             } catch (e: PackageManager.NameNotFoundException) {
                 // skip
+            }
+        }
+        // Inside the work profile, also try MATCH_ALL so parent-profile apps that
+        // Android exposes cross-profile can appear in the picker too.
+        if (isInWorkProfile()) {
+            try {
+                val all = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+                for (ri in all) {
+                    val pkg = ri.activityInfo.packageName
+                    if (pkg == packageName) continue
+                    if (!seen.add(pkg)) continue
+                    try {
+                        val info = pm.getApplicationInfo(pkg, 0)
+                        list.add(AppEntry(pkg, pm.getApplicationLabel(info).toString(), pm.getApplicationIcon(info)))
+                    } catch (e: Exception) {
+                        // skip
+                    }
+                }
+            } catch (e: Exception) {
+                // ignore
             }
         }
         allApps = list.sortedBy { it.label.lowercase() }
@@ -441,6 +498,7 @@ class MainActivity : AppCompatActivity() {
         val options = arrayOf("Buka (clone kalau ada)", cloneLabel, moveLabel, "Hapus dari ruang", "Batal")
         AlertDialog.Builder(this)
             .setTitle(entry.label + if (cloned) " ✓ diclone" else "")
+            .setMessage("Paket: " + entry.pkg + "\nBuat clone manual di Work Profile, ketik paket ini persis.")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> launchCloneOrOriginal(entry.pkg)
