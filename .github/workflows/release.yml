@@ -30,25 +30,28 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.1.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0
-          name: Shina Dual Space v2.0
+          tag_name: v2.1
+          name: Shina Dual Space v2.1
           body: |
-            Shina Dual Space v2.0 — now with real cloning via Android Work Profile.
+            Shina Dual Space v2.1 — clone fix for the Work Profile flow.
 
-            What changed from v1.0: v1 was only a launcher (tapping opened the original app). v2.0 creates a managed Work Profile (same technology as Shelter / Island / Samsung Secure Folder) and clones apps into it, so each clone has its own data and login, separate from the main app.
+            What was wrong in v2.0: Setup succeeded, but cloning did nothing. The cross-profile intent filters were only registered if you happened to open the work-profile copy of the app first, and the clone request intent was pinned to the personal profile so Android never forwarded it. If it landed in the wrong profile it was dropped silently.
 
-            Install: download ShinaDualSpace-v2.0.apk below, open it on your Android phone, allow installation if asked (it updates over v1.0, your Dual Space list and PIN stay). 
+            Fixes in v2.1:
+            - Cross-profile filters are now registered during provisioning (in the admin receiver, which runs inside the new profile) and again on work-side launch.
+            - Clone requests are no longer pinned to the personal profile and use a new-task flag.
+            - Wrong-profile clone requests now explain what happened instead of failing silently.
+            - Work profile detection no longer mistakes another app's work profile for ours.
+            - Inside the Work Profile, + Tambah now opens a manual clone dialog (type a package name such as com.whatsapp); the personal side shows each app's package name on long-press. The work-side picker also tries to list parent apps Android exposes cross-profile.
 
-            How to use the real clone:
-            1. Open the app and tap "Setup Work Profile", then approve Android's work profile creation screens. This is a one-time setup. If your phone already has a work profile from work/Shelter/Island, setup may fail — tell us in that case.
-            2. After setup, open Shina Dual Space once from the work profile side if Android asks (icon with a small briefcase badge), so it can finish enabling the profile.
-            3. Back in the main app, tap + Tambah and pick an app — it will be cloned into the Work Profile. Tap a cloned app (marked with a check) to launch the clone with separate data. Long-press an app for clone/open/move options.
-            4. Secret Zone and the optional 4-6 digit PIN lock from v1.0 are still there.
+            Install: download ShinaDualSpace-v2.1.apk below and install over v2.0. Your list and PIN stay.
 
-            Notes: one clone per app (one work profile), cloned apps show Android's briefcase badge outside this app, and removing a clone completely is done from Android Settings for the work profile. This is an install-over update of the v1.0 launcher with the same package name.
-          files: ShinaDualSpace-v2.0.apk
+            REQUIRED first step after updating (important, because your work profile was created by v2.0): open Shina Dual Space from the Work Profile once — that's the copy whose icon has the small briefcase badge, in the "Work" app tab — and leave it open a few seconds so it can register the clone filters. Then go back to the personal copy, add/clone your app. Alternatively, stay in the work copy, tap + Tambah, and clone manually by package name.
+
+            Honest note: this fixes the known v2.0 delivery bugs, but the flow still needs your on-device confirmation. If cloning still fails, tell us exactly which toast/message you see.
+          files: ShinaDualSpace-v2.1.apk
