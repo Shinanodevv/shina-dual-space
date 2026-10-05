@@ -1,9 +1,18 @@
 package com.shina.dualspace
 
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Bundle
+import android.os.Process
+import android.os.UserHandle
+import android.os.UserManager
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -32,6 +41,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pickerList: ListView
     private lateinit var emptyText: TextView
     private lateinit var sectionTitle: TextView
+    private lateinit var profileStatus: TextView
+    private lateinit var setupProfileBtn: Button
 
     private var allApps: List<AppEntry> = emptyList()
     private var section: Section = Section.DUAL
@@ -40,6 +51,16 @@ class MainActivity : AppCompatActivity() {
     private var unlocked: Boolean = false
 
     private val prefs by lazy { getSharedPreferences("dualspace", MODE_PRIVATE) }
+    private val admin: ComponentName by lazy { ComponentName(this, DualAdminReceiver::class.java) }
+    private val dpm: DevicePolicyManager by lazy { getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager }
+    private val userManager: UserManager by lazy { getSystemService(Context.USER_SERVICE) as UserManager }
+    private val launcherApps: LauncherApps by lazy { getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps }
+
+    companion object {
+        const val ACTION_CLONE = "com.shina.dualspace.CLONE"
+        const val ACTION_SETUP_PROFILE = "com.shina.dualspace.SETUP_PROFILE"
+        const val EXTRA_PKG = "pkg"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,8 +70,16 @@ class MainActivity : AppCompatActivity() {
         pickerList = findViewById(R.id.pickerList)
         emptyText = findViewById(R.id.emptyText)
         sectionTitle = findViewById(R.id.sectionTitle)
+        profileStatus = findViewById(R.id.profileStatus)
+        setupProfileBtn = findViewById(R.id.setupProfileBtn)
 
+        if (isInWorkProfile()) {
+            setupWorkProfileSide()
+        }
+
+        handleIncomingIntent(intent)
         loadApps()
+        updateProfileStatus()
 
         findViewById<EditText>(R.id.searchInput).addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) { query = s?.toString()?.trim() ?: ""; refresh() }
@@ -66,10 +95,11 @@ class MainActivity : AppCompatActivity() {
             refresh()
         }
         findViewById<Button>(R.id.lockBtn).setOnClickListener { pinMenu() }
+        setupProfileBtn.setOnClickListener { onSetupButton() }
 
         appGrid.setOnItemClickListener { _, _, pos, _ ->
             val entry = displayedEntries().getOrNull(pos) ?: return@setOnItemClickListener
-            launchApp(entry.pkg)
+            launchCloneOrOriginal(entry.pkg)
         }
         appGrid.setOnItemLongClickListener { _, _, pos, _ ->
             val entry = displayedEntries().getOrNull(pos) ?: return@setOnItemLongClickListener true
@@ -79,24 +109,249 @@ class MainActivity : AppCompatActivity() {
         pickerList.setOnItemClickListener { _, _, pos, _ ->
             val entry = displayedPicker().getOrNull(pos) ?: return@setOnItemClickListener
             addTo(entry.pkg, pickerTarget)
+            requestClone(entry.pkg)
             section = pickerTarget
             refresh()
         }
 
         refresh()
 
-        if (hasPin()) {
+        if (hasPin() && !isInWorkProfile()) {
             verifyPin("Masukin PIN buat buka Shina Dual Space") { finish() }
         } else {
             unlocked = true
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
     override fun onResume() {
         super.onResume()
         loadApps()
+        updateProfileStatus()
         if (section != Section.PICKER) refresh()
     }
+
+    // ---- Work Profile detection ----
+
+    private fun isInWorkProfile(): Boolean {
+        return try {
+            dpm.isManagedProfile(admin)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun isProfileOwner(): Boolean {
+        return try {
+            dpm.isProfileOwnerApp(packageName)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun workProfileUser(): UserHandle? {
+        val myHandle = Process.myUserHandle()
+        val profiles = try { userManager.userProfiles } catch (e: Exception) { emptyList() }
+        if (isInWorkProfile()) return myHandle
+        for (profile in profiles) {
+            if (profile != myHandle) {
+                // Confirm our app exists in that profile (= likely our work profile)
+                try {
+                    val apps = launcherApps.getActivityList(packageName, profile)
+                    if (apps.isNotEmpty()) return profile
+                } catch (e: Exception) {
+                    // keep looking
+                }
+            }
+        }
+        // Fallback: any non-primary profile
+        return profiles.firstOrNull { it != myHandle }
+    }
+
+    private fun hasWorkProfile(): Boolean = workProfileUser() != null
+
+    private fun updateProfileStatus() {
+        val inWork = isInWorkProfile()
+        val hasWork = hasWorkProfile()
+        when {
+            inWork -> {
+                profileStatus.text = "Work Profile: AKTIF (kamu lagi di dalam profil clone)"
+                setupProfileBtn.text = "Profil udah aktif"
+                setupProfileBtn.isEnabled = false
+            }
+            hasWork -> {
+                profileStatus.text = "Work Profile: AKTIF ✓ clone pisah data siap"
+                setupProfileBtn.text = "Work Profile udah ada"
+                setupProfileBtn.isEnabled = false
+            }
+            else -> {
+                profileStatus.text = "Work Profile: BELUM SETUP — tap tombol di bawah"
+                setupProfileBtn.text = "Setup Work Profile"
+                setupProfileBtn.isEnabled = true
+            }
+        }
+    }
+
+    private fun onSetupButton() {
+        if (isInWorkProfile() || hasWorkProfile()) {
+            Toast.makeText(this, "Work Profile udah aktif", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Setup Work Profile")
+            .setMessage("Android bakal minta izin bikin Work Profile baru buat Shina Dual Space. Di profil itu clone app punya data & login sendiri, pisah dari app utama.\n\nCatatan: kalau HP kamu udah punya Work Profile dari kantor/Shelter/Island, setup ini bisa gagal — bilang ke Shina ya.")
+            .setPositiveButton("Lanjut") { _, _ -> startProvisioning() }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun startProvisioning() {
+        try {
+            val intent = Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE)
+            intent.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME, admin)
+            intent.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_SKIP_ENCRYPTION, true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                intent.putExtra(
+                    DevicePolicyManager.EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE,
+                    android.os.PersistableBundle().apply {
+                        putString("shina", "dual")
+                    }
+                )
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gagal mulai setup: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // Runs inside the work profile after provisioning
+    private fun setupWorkProfileSide() {
+        try {
+            dpm.setProfileName(admin, "Shina Dual")
+            dpm.setProfileEnabled(admin)
+        } catch (e: Exception) {
+            // ignore
+        }
+        try {
+            val filter = IntentFilter(ACTION_CLONE)
+            filter.addCategory(Intent.CATEGORY_DEFAULT)
+            val filter2 = IntentFilter(ACTION_SETUP_PROFILE)
+            filter2.addCategory(Intent.CATEGORY_DEFAULT)
+            val flags = DevicePolicyManager.FLAG_MANAGED_CAN_ACCESS_PARENT or DevicePolicyManager.FLAG_PARENT_CAN_ACCESS_MANAGED
+            dpm.addCrossProfileIntentFilter(admin, filter, flags)
+            dpm.addCrossProfileIntentFilter(admin, filter2, flags)
+        } catch (e: Exception) {
+            // ignore
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                dpm.setCrossProfilePackages(admin, setOf(packageName))
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        if (intent.action == ACTION_CLONE) {
+            val pkg = intent.getStringExtra(EXTRA_PKG) ?: return
+            if (isInWorkProfile() || isProfileOwner()) {
+                cloneInsideWork(pkg)
+            }
+        }
+    }
+
+    private fun cloneInsideWork(pkg: String) {
+        try {
+            val ok = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                dpm.installExistingPackage(admin, pkg)
+            } else {
+                @Suppress("DEPRECATION")
+                dpm.installExistingPackage(admin, pkg)
+            }
+            Toast.makeText(this, if (ok) "Clone dibuat: $pkg" else "Clone gagal / udah ada: $pkg", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Clone gagal: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun requestClone(pkg: String) {
+        if (isInWorkProfile()) {
+            cloneInsideWork(pkg)
+            return
+        }
+        if (!hasWorkProfile()) {
+            Toast.makeText(this, "Udah ditambahin. Setup Work Profile dulu biar jadi clone beneran (data pisah).", Toast.LENGTH_LONG).show()
+            return
+        }
+        // Ask the work-profile side of our app to install the existing package there
+        try {
+            val intent = Intent(ACTION_CLONE)
+            intent.addCategory(Intent.CATEGORY_DEFAULT)
+            intent.putExtra(EXTRA_PKG, pkg)
+            intent.setPackage(packageName)
+            startActivity(intent)
+            Toast.makeText(this, "Minta clone $pkg ke Work Profile...", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Belum bisa clone otomatis. Buka Shina Dual Space dari Work Profile (ikon badge koper), lalu clone dari sana.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun isCloned(pkg: String): Boolean {
+        val work = workProfileUser() ?: return false
+        if (isInWorkProfile()) return true
+        return try {
+            launcherApps.getActivityList(pkg, work).isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun launchCloneOrOriginal(pkg: String) {
+        if (isInWorkProfile()) {
+            launchOriginal(pkg)
+            return
+        }
+        val work = workProfileUser()
+        if (work != null) {
+            try {
+                val activities = launcherApps.getActivityList(pkg, work)
+                if (activities.isNotEmpty()) {
+                    val comp = activities[0].componentName
+                    launcherApps.startMainActivity(comp, work, null, null)
+                    return
+                }
+            } catch (e: Exception) {
+                // fall through
+            }
+            // Not cloned yet
+            AlertDialog.Builder(this)
+                .setTitle("Belum diclone")
+                .setMessage("App ini belum ada di Work Profile. Clone sekarang biar data & login-nya pisah?")
+                .setPositiveButton("Clone") { _, _ -> requestClone(pkg) }
+                .setNegativeButton("Buka app utama") { _, _ -> launchOriginal(pkg) }
+                .show()
+            return
+        }
+        launchOriginal(pkg)
+    }
+
+    private fun launchOriginal(pkg: String) {
+        val intent = packageManager.getLaunchIntentForPackage(pkg)
+        if (intent == null) {
+            Toast.makeText(this, "App ini ga bisa dibuka dari sini", Toast.LENGTH_SHORT).show()
+            return
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+    }
+
+    // ---- App list ----
 
     private fun loadApps() {
         val pm = packageManager
@@ -112,7 +367,7 @@ class MainActivity : AppCompatActivity() {
                 val info = pm.getApplicationInfo(pkg, 0)
                 list.add(AppEntry(pkg, pm.getApplicationLabel(info).toString(), pm.getApplicationIcon(info)))
             } catch (e: PackageManager.NameNotFoundException) {
-                // skip removed apps
+                // skip
             }
         }
         allApps = list.sortedBy { it.label.lowercase() }
@@ -145,9 +400,8 @@ class MainActivity : AppCompatActivity() {
             appGrid.visibility = View.GONE
             emptyText.visibility = View.GONE
             pickerList.visibility = View.VISIBLE
-            sectionTitle.text = "Pilih app buat ditambah"
-            val data = displayedPicker()
-            pickerList.adapter = PickerAdapter(data)
+            sectionTitle.text = "Pilih app buat diclone"
+            pickerList.adapter = PickerAdapter(displayedPicker())
             return
         }
         pickerList.visibility = View.GONE
@@ -158,18 +412,8 @@ class MainActivity : AppCompatActivity() {
         emptyText.text = if (section == Section.SECRET)
             "Secret Zone kosong. Tap + Tambah pas lagi di tab ini buat sembunyiin app di sini."
         else
-            "Belum ada app. Tap + Tambah buat masukin app pertamamu."
+            "Belum ada app. Tap + Tambah, pilih app, lalu clone ke Work Profile."
         appGrid.adapter = GridAdapter(data)
-    }
-
-    private fun launchApp(pkg: String) {
-        val intent = packageManager.getLaunchIntentForPackage(pkg)
-        if (intent == null) {
-            Toast.makeText(this, "App ini ga bisa dibuka dari sini", Toast.LENGTH_SHORT).show()
-            return
-        }
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
     }
 
     private fun addTo(pkg: String, target: Section) {
@@ -180,26 +424,29 @@ class MainActivity : AppCompatActivity() {
             val d = dualSet(); d.add(pkg); saveSet("dual_pkgs", d)
             val s = secretSet(); s.remove(pkg); saveSet("secret_pkgs", s)
         }
-        Toast.makeText(this, "Ditambahin", Toast.LENGTH_SHORT).show()
     }
 
     private fun removeFrom(pkg: String) {
         val d = dualSet(); d.remove(pkg); saveSet("dual_pkgs", d)
         val s = secretSet(); s.remove(pkg); saveSet("secret_pkgs", s)
         refresh()
+        Toast.makeText(this, "Dihapus dari daftar. Clone di Work Profile hapus dari Settings > Work Profile kalau mau bersih total.", Toast.LENGTH_LONG).show()
     }
 
     private fun manageApp(entry: AppEntry) {
         val inSecret = secretSet().contains(entry.pkg)
+        val cloned = isCloned(entry.pkg)
         val moveLabel = if (inSecret) "Pindah ke Dual Space" else "Sembunyiin ke Secret Zone"
-        val options = arrayOf("Buka app", moveLabel, "Hapus dari ruang", "Batal")
+        val cloneLabel = if (cloned) "Clone ulang / cek clone" else "Clone ke Work Profile"
+        val options = arrayOf("Buka (clone kalau ada)", cloneLabel, moveLabel, "Hapus dari ruang", "Batal")
         AlertDialog.Builder(this)
-            .setTitle(entry.label)
+            .setTitle(entry.label + if (cloned) " ✓ diclone" else "")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> launchApp(entry.pkg)
-                    1 -> { addTo(entry.pkg, if (inSecret) Section.DUAL else Section.SECRET); refresh() }
-                    2 -> removeFrom(entry.pkg)
+                    0 -> launchCloneOrOriginal(entry.pkg)
+                    1 -> requestClone(entry.pkg)
+                    2 -> { addTo(entry.pkg, if (inSecret) Section.DUAL else Section.SECRET); refresh() }
+                    3 -> removeFrom(entry.pkg)
                 }
             }
             .show()
@@ -317,7 +564,8 @@ class MainActivity : AppCompatActivity() {
             icon.layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
             layout.addView(icon)
             val label = TextView(this@MainActivity)
-            label.text = entry.label
+            val clonedMark = if (isCloned(entry.pkg)) " ✓" else ""
+            label.text = entry.label + clonedMark
             label.setTextColor(0xFFFFFFFF.toInt())
             label.textSize = 11f
             label.maxLines = 1
