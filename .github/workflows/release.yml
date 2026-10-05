@@ -30,27 +30,27 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.3.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.4.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.3
-          name: Shina Dual Space v2.3
+          tag_name: v2.4
+          name: Shina Dual Space v2.4
           body: |
-            Shina Dual Space v2.3 — fixes cloned apps doing nothing when tapped.
+            Shina Dual Space v2.4 — clone actually reaches the Work Profile now.
 
-            Root cause found: v2.2 protected the clone entry point with a signature-level permission. Every GitHub Actions debug build is signed with a fresh runner debug key, so the copy in your personal profile and the copy inside the Work Profile (installed from a different release) have different certificates — Android silently blocked every clone request. Tapping did nothing.
+            What was wrong (confirmed on a Xiaomi device): tapping Clone opened Android's "Complete Action Using" chooser and its Work tab was always empty, so requests looped back to the personal profile. Implicit cross-profile intent forwarding is unreliable on OEM resolvers.
 
-            Changes in v2.3:
-            - Removed the signature permission from the clone entry point. Safety now comes from the mandatory confirmation dialog in the work profile: nothing can be cloned without you tapping "Ya, clone". Another app can at most pop that dialog.
-            - Launch failures are no longer swallowed silently; you will see the actual launch error in a dialog instead of a dead tap.
-            - Finance-app warnings from v2.2 stay.
+            Changes in v2.4:
+            - Clone requests now use CrossProfileApps.startActivity, the official API for an app to start its own counterpart in the other profile. It goes straight to the work-profile copy's confirmation dialog, no chooser in between. The old implicit-intent path remains as a fallback.
+            - Stable signing: builds are now signed with a committed throwaway debug-grade keystore instead of a fresh runner key every build. From v2.4 onward, future updates install over each other and both profile copies share one signature. (This is why one last clean start is needed: v2.4's signature differs from v2.3's.)
+            - Finance-app warnings and the mandatory confirmation dialog stay.
 
-            REQUIRED clean start (important): because the old Work Profile was created by a differently-signed build, delete it first, then set up fresh with this single v2.3 APK so both copies share one signature.
-            1. Settings > search "profil kerja" > Hapus profil kerja (this deletes old clones and their data; your main apps are untouched).
-            2. Uninstall Shina Dual Space, then install ShinaDualSpace-v2.3.apk.
-            3. Open it > Setup Work Profile > approve. Open the briefcase-badge copy once, then clone from the main copy and confirm the dialog.
+            One last clean start:
+            1. Settings > search "profil kerja" > Hapus profil kerja (old clones and their data are deleted; main apps untouched).
+            2. Uninstall Shina Dual Space, install ShinaDualSpace-v2.4.apk.
+            3. Open it > Setup Work Profile > approve. Then clone from the main copy: it should jump straight to the work-profile "Ya, clone" confirmation, with no Personal/Work chooser.
 
-            Honest note: this fixes the identified signature-mismatch blocker, but on-device confirmation is still needed. If a tap still fails, the new dialog shows the error text — send us exactly that text.
-          files: ShinaDualSpace-v2.3.apk
+            If it still fails, tell us exactly what appears instead of the confirmation dialog.
+          files: ShinaDualSpace-v2.4.apk
