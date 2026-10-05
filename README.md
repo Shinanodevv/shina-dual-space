@@ -2,12 +2,13 @@
 
 Dual-space style app cloner inspired by Multiple Accounts: Dual Space. Clone apps into an Android Work Profile so each clone has separate data and login.
 
-## v2.1 — clone fix
-v2.0's Setup worked but cloning silently did nothing: cross-profile filters were only registered after a work-side launch, clone intents were pinned to the personal profile, and wrong-profile requests were dropped without feedback.
+## v2.2 — security hardening
+- Clone trigger moved off the exported launcher into a dedicated `CloneActivity` protected by a signature-level permission — only same-certificate copies (personal + work profile) can trigger it
+- Every clone requires an explicit confirmation dialog before installing
+- Hard warning before cloning Indonesian banking / e-wallet apps (fresh Work Profile sessions can look high-risk to banks; do not clone finance apps)
+- v2.1 clone-delivery fixes retained: filters registered at provisioning, unpinned cross-profile intents, manual clone-by-package inside the Work Profile
 
-v2.1 registers the filters during provisioning, forwards clone requests correctly, explains wrong-profile requests, fixes work-profile detection, and adds a manual clone-by-package dialog inside the Work Profile.
-
-After updating an existing v2.0 profile, open the Work Profile copy (briefcase badge) once first, then clone from the personal copy — or clone manually inside the work copy.
+After updating, open the Work Profile copy (briefcase badge) once, then clone from the personal copy.
 
 ## Features
 - Managed Work Profile (same tech as Shelter / Island / Samsung Secure Folder)
