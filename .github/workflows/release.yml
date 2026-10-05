@@ -30,28 +30,23 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.1.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk ShinaDualSpace-v2.2.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.1
-          name: Shina Dual Space v2.1
+          tag_name: v2.2
+          name: Shina Dual Space v2.2
           body: |
-            Shina Dual Space v2.1 — clone fix for the Work Profile flow.
+            Shina Dual Space v2.2 — security hardening for the clone trigger.
 
-            What was wrong in v2.0: Setup succeeded, but cloning did nothing. The cross-profile intent filters were only registered if you happened to open the work-profile copy of the app first, and the clone request intent was pinned to the personal profile so Android never forwarded it. If it landed in the wrong profile it was dropped silently.
+            Why: in v2.0/v2.1 the exported MainActivity also carried the CLONE intent-filter with no permission, so any other app on the phone could send a clone intent into the Work Profile and it would run installExistingPackage immediately (with only a toast). That pattern resembles the abused Shelter-fork pattern in recent Vwork/Gigabud reporting. This is hardening based on a code review — it is not a report that the app was exploited.
 
-            Fixes in v2.1:
-            - Cross-profile filters are now registered during provisioning (in the admin receiver, which runs inside the new profile) and again on work-side launch.
-            - Clone requests are no longer pinned to the personal profile and use a new-task flag.
-            - Wrong-profile clone requests now explain what happened instead of failing silently.
-            - Work profile detection no longer mistakes another app's work profile for ours.
-            - Inside the Work Profile, + Tambah now opens a manual clone dialog (type a package name such as com.whatsapp); the personal side shows each app's package name on long-press. The work-side picker also tries to list parent apps Android exposes cross-profile.
+            Changes in v2.2:
+            - Clone requests now go through a dedicated CloneActivity protected by a signature-level permission (com.shina.dualspace.permission.TRIGGER_CLONE). Only apps signed with the same certificate — our personal-profile and work-profile copies — can trigger it. The launcher MainActivity no longer accepts clone intents.
+            - Every clone request now requires an explicit confirmation dialog in the work profile ("Ya, clone" / "Batal") before anything is installed.
+            - Indonesian banking / e-wallet apps trigger a hard warning before cloning (banking apps may treat a fresh Work Profile session as a high-risk signal). It warns and requires an explicit "Tetap lanjut, saya paham" — it does not silently proceed. Strong recommendation: do not clone banking/e-wallet apps.
+            - Same warnings apply to the in-app clone picker and the manual clone-by-package dialog.
 
-            Install: download ShinaDualSpace-v2.1.apk below and install over v2.0. Your list and PIN stay.
-
-            REQUIRED first step after updating (important, because your work profile was created by v2.0): open Shina Dual Space from the Work Profile once — that's the copy whose icon has the small briefcase badge, in the "Work" app tab — and leave it open a few seconds so it can register the clone filters. Then go back to the personal copy, add/clone your app. Alternatively, stay in the work copy, tap + Tambah, and clone manually by package name.
-
-            Honest note: this fixes the known v2.0 delivery bugs, but the flow still needs your on-device confirmation. If cloning still fails, tell us exactly which toast/message you see.
-          files: ShinaDualSpace-v2.1.apk
+            Install: download ShinaDualSpace-v2.2.apk below and install over v2.1. Your list, PIN and existing Work Profile stay. After updating, open the Work Profile copy (briefcase badge) once, as with v2.1, then clone from the personal copy and confirm the new dialog.
+          files: ShinaDualSpace-v2.2.apk
