@@ -12,11 +12,11 @@ import androidx.appcompat.app.AppCompatActivity
 
 /**
  * The ONLY exported entry point for cross-profile clone requests.
- * Protected by a signature-level permission: only apps signed with the same
- * certificate (our personal-profile and work-profile copies) can trigger it,
- * and every request requires an explicit user confirmation in this activity
- * before anything is installed. v2.0/v2.1 put the CLONE filter on the exported
- * MainActivity with no permission and cloned immediately.
+ * v2.2 protected it with a signature-level permission, but every GitHub
+ * Actions debug build uses a fresh signing key, so the two profile copies
+ * never matched and Android silently blocked all requests. Since v2.3 the
+ * protection is the explicit confirmation dialog below: a request can at
+ * most pop the dialog, it can never install without the user tapping Ya.
  */
 class CloneActivity : AppCompatActivity() {
 

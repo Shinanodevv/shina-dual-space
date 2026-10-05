@@ -377,6 +377,7 @@ class MainActivity : AppCompatActivity() {
         }
         val work = workProfileUser()
         if (work != null) {
+            var launchError: String? = null
             try {
                 val activities = launcherApps.getActivityList(pkg, work)
                 if (activities.isNotEmpty()) {
@@ -385,12 +386,18 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
             } catch (e: Exception) {
-                // fall through
+                // v2.3: jangan ditelan diam-diam — user kemarin cuma liat "mental"
+                // tanpa tau kenapa. Kasih tau, baru tawarin jalan lain.
+                launchError = e.message
             }
-            // Not cloned yet
+            // Not cloned yet (or launch failed)
             AlertDialog.Builder(this)
-                .setTitle("Belum diclone")
-                .setMessage("App ini belum ada di Work Profile. Clone sekarang biar data & login-nya pisah?")
+                .setTitle("Belum bisa dibuka")
+                .setMessage(
+                    "App ini belum kebuka sebagai clone di Work Profile." +
+                        (if (launchError != null) "\n\nError launch: $launchError" else "") +
+                        "\n\nClone sekarang biar data & login-nya pisah?"
+                )
                 .setPositiveButton("Clone") { _, _ -> requestClone(pkg) }
                 .setNegativeButton("Buka app utama") { _, _ -> launchOriginal(pkg) }
                 .show()
