@@ -333,7 +333,7 @@ class MainActivity : AppCompatActivity() {
                     val target = Intent(this, CloneActivity::class.java)
                     target.action = ACTION_CLONE
                     target.putExtra(EXTRA_PKG, pkg)
-                    cpa.startActivity(target, work)
+                    cpa.startActivity(target, work, this)
                     Toast.makeText(this, "Minta clone $pkg ke Work Profile... cek dialog konfirmasinya ya.", Toast.LENGTH_LONG).show()
                     return
                 }
